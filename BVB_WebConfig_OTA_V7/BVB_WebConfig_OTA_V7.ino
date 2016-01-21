@@ -32,7 +32,7 @@
 #include <Ticker.h>
 #include <EEPROM.h>
 #include <WiFiUdp.h>
-#include <credentials.h>
+//#include <credentials.h>
 
 #include "helpers.h"
 #include "global.h"
@@ -50,7 +50,6 @@
 #include "Page_General.h"
 #include "Page_applSettings.h"
 #include "PAGE_NetworkConfiguration.h"
-#include "example.h"
 
 extern "C" {
 #include "user_interface.h"
@@ -91,22 +90,23 @@ void setup ( void ) {
   {
     // DEFAULT CONFIG
     Serial.println("Setting default parameters");
-    config.ssid = ASP_SSID; // SSID of access point
-    config.password = ASP_password;  // password of access point
+    config.ssid = "#Freibier"; // SSID of access point
+    config.password = "geheim";  // password of access point
     config.dhcp = true;
     config.IP[0] = 192; config.IP[1] = 168; config.IP[2] = 1; config.IP[3] = 100;
     config.Netmask[0] = 255; config.Netmask[1] = 255; config.Netmask[2] = 255; config.Netmask[3] = 0;
     config.Gateway[0] = 192; config.Gateway[1] = 168; config.Gateway[2] = 1; config.Gateway[3] = 1;
     config.ntpServerName = "0.ch.pool.ntp.org";
     config.Update_Time_Via_NTP_Every =  5;
-    config.timeZone = 1;
+    config.timeZone = 10;
     config.isDayLightSaving = true;
-    config.DeviceName = "Not Named";
-    config.wayToStation = 3;
+    config.DeviceName = "vagfr";
+    config.wayToStation = 4;
     config.warningBegin = 5;
-    config.base = "lausen stutz";
-    config.right = "lausen";
-    config.left = "lausen";
+    config.base = "6930811";
+    config.right = "6906508";
+    config.left = "6930206";
+    config.product = 'T';
     WriteConfig();
   }
   if (!(digitalRead(LEFTPIN) || digitalRead(RIGHTPIN))) {   // OTA Mode?
@@ -215,7 +215,7 @@ void customLoop() {
       if (AdminTimeOutCounter > AdminTimeOut) {
         Serial.println("Admin Mode disabled!");
         ledColor = red;
-        for (int hi = 0; hi < 3; hi++) beep(2);
+        beepTimes(3);
         WiFi.mode(WIFI_AP);
         ConfigureWifi();
         ledColor = green;
@@ -230,13 +230,22 @@ void customLoop() {
       break;
 
     case idle:
-      if (lastStatus != idle) Serial.println("Status idle");
-      ledColor = off;
-      storeDirToEEPROM(none);
-      freq = -1;  // no signal
-      url = "";
-      JSONline = "";
-
+      if (lastStatus != idle){
+        Serial.println("Status idle");
+        storeDirToEEPROM(none);
+        minTillDep = -999;
+        secTillDep = -999;
+       }
+       
+        
+        freq = -1;  // no signal
+        url = "";
+        JSONline = "";
+        warn_3 = false;
+        warn_2 = false;
+        warn_1 = false;  
+        ledColor = off;
+      
       // exit
       _dir = readButton();
       if (_dir == left) status = requestLeft;
@@ -249,15 +258,15 @@ void customLoop() {
     case requestLeft:
       if (lastStatus != requestLeft) Serial.println("Status requestLeft");
       storeDirToEEPROM(left);
-      url = "/v1/connections?from=" + config.base + "&to=" + config.left  + "&fields[]=connections/from/departure&fields[]=connections/from/prognosis/departure&fields[]=connections/from/departureTimestamp&limit=" + MAX_CONNECTIONS;
+      url = "/connectionEsp?from=" + config.base + "&to=" + config.left  + "&product="+ config.product +"&timeOffset=" + config.wayToStation;
       if (lastStatus != requestLeft) storeDepartureString(); // if valid url
       if (JSONline.length() > 1) {
         processRequest();
 
         // exit
-        if (lastDepartureTimeStamp != departureTimeStamp && (lastStatus == requestRight || lastStatus == requestLeft)) status = idle; // next departure time choosen
+        if (lastDepartureTimeStamp != plannedDepartureTimeStamp && (lastStatus == requestRight || lastStatus == requestLeft)) status = idle; // next departure time choosen
         //  Serial.printf("lastDepartureTimeStamp %d departureTimeStamp %d lastStatus %d \n", lastDepartureTimeStamp , departureTimeStamp, lastStatus);
-        lastDepartureTimeStamp = departureTimeStamp;
+        lastDepartureTimeStamp = plannedDepartureTimeStamp;
         lastStatus = requestLeft;
       }
       _dir = readButton();
@@ -274,15 +283,15 @@ void customLoop() {
     case requestRight:
       if (lastStatus != requestRight) Serial.println("Status requestRight");
       storeDirToEEPROM(right);
-      url = "/v1/connections?from=" + config.base + "&to=" + config.right  + "&fields[]=connections/from/departure&fields[]=connections/from/prognosis/departure&fields[]=connections/from/departureTimestamp&limit=" + MAX_CONNECTIONS;
+      url = "/connectionEsp?from=" + config.base + "&to=" + config.right  + "&product="+ config.product +"&timeOffset=" + config.wayToStation;
       if (lastStatus != requestRight) storeDepartureString(); // if valid url
       if (JSONline.length() > 1) {
         processRequest();
 
         // exit
-        if (lastDepartureTimeStamp != departureTimeStamp && (lastStatus == requestRight || lastStatus == requestRight)) status = idle; // next departure time choosen
+        if (lastDepartureTimeStamp != plannedDepartureTimeStamp && (lastStatus == requestRight || lastStatus == requestRight)) status = idle; // next departure time choosen
         //  Serial.printf("lastDepartureTimeStamp %d departureTimeStamp %d lastStatus %d \n", lastDepartureTimeStamp , departureTimeStamp, lastStatus);
-        lastDepartureTimeStamp = departureTimeStamp;
+        lastDepartureTimeStamp = plannedDepartureTimeStamp;
         lastStatus = requestRight;
       }
       _dir = readButton();
@@ -338,10 +347,12 @@ void customLoop() {
 
   // store departure time String from openTransport
   if (millis() - waitJSONLoopEntry > loopTime) {
-    if (minTillDep > 1 || minTillDep < 0) { // no updates in the last minute
-      if (url.length() > 1) storeDepartureString();  // if valid url
-      if (JSONline != "") waitJSONLoopEntry = millis();
+    if (minTillDep < 0 || minTillDep > config.wayToStation+1) { // no updates in the last minute
+      requestBackendUpdate(config.wayToStation);
     }
+    else if(minTillDep <= config.wayToStation && minTillDep > 0){
+        requestBackendUpdate(minTillDep);
+      }
   }
 
   // Display LED
@@ -370,7 +381,7 @@ void customLoop() {
 
 
 void processRequest() {
-  long _diffSec, _diffMin;
+  long _diffSec, _diffMin, _diffSecDep;
 
   int   _positionDeparture = 1;
   do {
@@ -379,18 +390,30 @@ void processRequest() {
       _diffSec = departureTime - actualTime;
       if (_diffSec < -10000) _diffSec += 24 * 3600;  // correct if time is before midnight and departure is after midnight
       _diffMin = (_diffSec / 60) - config.wayToStation;
+      _diffSecDep = _diffSec - (config.wayToStation*60) ;
     } else _diffMin = -999;
     _positionDeparture++;
   } while (_diffMin < 0 && _positionDeparture <= MAX_CONNECTIONS + 1);  // next departure if first not reachable
 
   minTillDep = (_positionDeparture <= MAX_CONNECTIONS) ? _diffMin : -999; // no connection found
-
+  secTillDep = (_positionDeparture <= MAX_CONNECTIONS) ? _diffSecDep : -999; // no connection found
+  
   if (minTillDep != -999) {  // valid result
-    freq = (minTillDep >= 0 && minTillDep < 10) ? intensity[minTillDep] : freq = -1; //set frequency if minTillDep between 10 and zero minutes
+    freq = (minTillDep >= 0 && secTillDep < config.warningBegin) ? intensity[minTillDep] : freq = -1; //set frequency if minTillDep between 10 and zero minutes
+    checkWarn(minTillDep);
     loopTime = getLoopTime(minTillDep);
   }
 }
 
+
+void requestBackendUpdate(int offset){
+  if (url.length() > 1){
+    setUrlTimeOffset(offset);
+    storeDepartureString();
+    } 
+  if (JSONline != "") waitJSONLoopEntry = millis();
+  
+}
 
 boolean getStatus() {
   bool stat;
@@ -426,7 +449,7 @@ void storeDepartureString() {
 
   url.replace(" ", "%20");
 
-  if (!client.connect("transport.opendata.ch", 80)) {
+  if (!client.connect(serverTransport, httpPort)) {
     Serial.println("connection to ... failed");
 
   } else {
@@ -489,7 +512,7 @@ void decodeDepartureTime(int pos) {
   int minute;
   int second;
   int i = 0;
-  long h1, h2, hh;
+  long hh;
   int separatorPosition = 1;
   String keyword[3];
 
@@ -499,23 +522,19 @@ void decodeDepartureTime(int pos) {
   }
   // separatorPosition stands at the line requested by calling function
   for (int i = 0; i < 3; i++) keyword[i] = "";
-  hh = findJSONkeyword("departure", "", "", separatorPosition);
-  h1 = parseJSONDate(hh);
 
-  // Serial.println(JSONline);
-
-  hh = findJSONkeyword("prognosis", "departure", "" , separatorPosition);
-  h2 = parseJSONDate(hh);
-
-  hh = findJSONkeyword("departureTimestamp", "", "" , separatorPosition);  // find unique identifier of connection
-  departureTimeStamp = parseJSONnumber(hh);
-  departureTime = ( h2 > 0) ? h2 : h1;
+  hh = findJSONkeyword("departureTime", "", "" , separatorPosition);
+  departureTime = parseJSONDate(hh);
+  
+  hh = findJSONkeyword("plannedDepartureTimestamp", "", "" , separatorPosition);  // find unique identifier of connection
+  plannedDepartureTimeStamp = parseJSONnumber(hh);
+  
 }
 
 
 int getTimeStamp(int pos) {
 
-  int hh = findJSONkeyword("departureTimestamp", "", "", pos );
+  int hh = findJSONkeyword("plannedDepartureTimestamp", "", "", pos );
   return JSONline.substring(pos, pos + 4).toInt();
 }
 
@@ -525,7 +544,7 @@ int getTimeStamp(int pos) {
 
 long parseJSONDate(int pos) {
   int hi;
-  pos = pos + 11;  // adjust for beginning of text
+  pos = pos + 15;  // adjust for beginning of text
   if (JSONline.substring(pos, pos + 4) != "null" ) {
     pos = pos + 12; // overread date;
 
@@ -548,7 +567,7 @@ long parseJSONDate(int pos) {
 
 
 int parseJSONnumber(int pos) {
-  pos = pos + 20;
+  pos = pos + 27;
   return JSONline.substring(pos, pos + 10).toInt();
 }
 
@@ -573,12 +592,37 @@ void beep(int _dura) {
 
 }
 
+void beepTimes(int times){
+  for (int hi = 0; hi < times; hi++) beep(2);
+  }
+
 void setSignal (int _onTime, int _offTime) {
   if (beeperStatus == beeperIdle) {
     beepOnTime = _onTime;
     beepOffTime = _offTime;
   }
 }
+
+void checkWarn(int minTillDep){
+  if(minTillDep == 2 && !warn_3){
+      beepTimes(3);
+      warn_3 = true;
+    }
+    else if(minTillDep == 1 && !warn_2){
+      beepTimes(2);
+      warn_2 = true;
+    }
+    else if(minTillDep == 0 && !warn_1){
+      beepTimes(1);
+      warn_1 = true;
+    }
+  }
+
+void setUrlTimeOffset(int min){
+  int offsetPosition = url.indexOf("timeOffset=");
+  String urlPart = url.substring(0,offsetPosition+11);
+  url = urlPart+min;
+}  
 
 // define loop time based on time till departure
 int getLoopTime(int _timeTillDeparture) {
@@ -611,21 +655,40 @@ void printTime(String purpose, long _tim) {
   Serial.print(purpose);
   Serial.print(" ");
   Serial.print(hours);
-  Serial.print(" H ");
+  Serial.print(" : ");
   Serial.print(minutes);
-  Serial.print(" M ");
+  Serial.print(" : ");
   Serial.print(seconds);
+  Serial.print(" ");
+}
+
+void printDepTime(String purpose, long _tim) {
+
+  int hours = _tim / 3600;
+  int res = _tim - hours * 3600;
+  int minutes = res / 60;
+  res = res - (minutes * 60);
+  int seconds = res;
+  Serial.print(" ");
+  Serial.print(purpose);
+  Serial.print(" ");
+  Serial.print(hours);
+  Serial.print(" : ");
+  Serial.print(minutes);
+  Serial.print(" ");
 }
 
 void displayStatus() {
-  printTime("Tim", actualTime);
-  printTime("Dep", departureTime);
+  printTime("Time", actualTime);
+  printDepTime("Dep", departureTime);
   Serial.print(" Status ");
   Serial.print(status);
   Serial.print(" lastStatus ");
   Serial.print(lastStatus);
   Serial.print(" minTillDep ");
   Serial.print(minTillDep);
+  Serial.print(" secTillDep ");
+  Serial.print(secTillDep);
   Serial.print(" loopTime ");
   Serial.print(loopTime);
   Serial.print(" freq ");

@@ -12,8 +12,9 @@ Connect to Router with these settings:<br>
 <tr><td align="right">Home:</td><td><input type="text" id="base" name="base" value=""></td></tr>
 <tr><td align="right">Left:</td><td><input type="text" id="left" name="left" value=""></td></tr>
 <tr><td align="right">Right:</td><td><input type="text" id="right" name="right" value=""></td></tr>
+<tr><td align="right">Product (B)us, (T)ram:</td><td><input type="text" id="product" name="product" value=""></td></tr>
 <tr><td align="right">Way to station (min):</td><td><input type="text" id="wayToStation" name="wayToStation" value=""></td></tr>
-<tr><td align="right">Warning starts (min):</td><td><input type="text" id="warningBegin" name="warningBegin" value=""></td></tr>
+<tr><td align="right">Warning starts (sec):</td><td><input type="text" id="warningBegin" name="warningBegin" value=""></td></tr>
 
 <tr><td colspan="2" align="center"><input type="submit" style="width:150px" class="btn btn--m btn--blue" value="Save"></td></tr>
 </table>
@@ -57,6 +58,7 @@ void send_application_configuration_html()
       if (server.argName(i) == "base") config.base =   urldecode(server.arg(i));
       if (server.argName(i) == "left") config.left =    urldecode(server.arg(i));
       if (server.argName(i) == "right") config.right =    urldecode(server.arg(i));
+      if (server.argName(i) == "product") config.product =    urldecode(server.arg(i)).charAt(0);
       if (server.argName(i) == "wayToStation") config.wayToStation =  urldecode(server.arg(i)).toInt();
       if (server.argName(i) == "warningBegin") config.warningBegin =  urldecode(server.arg(i)).toInt();
       }
@@ -65,6 +67,8 @@ void send_application_configuration_html()
 
     if (config.warningBegin>10) config.warningBegin=10;
     if (config.warningBegin<0) config.warningBegin=0;
+
+    if (config.product != 'T' || config.product != 'B') config.product= 'T';
     
     WriteConfig();
   }
@@ -86,6 +90,7 @@ void send_application_configuration_values_html()
   values += "base|" + (String) config.base + "|input\n";
   values += "left|" +  (String) config.left + "|input\n";
   values += "right|" +  (String) config.right + "|input\n";
+  values += "product|" +  (String) config.product + "|input\n";
   values += "wayToStation|" +  (String) config.wayToStation + "|input\n";
    values += "warningBegin|" +  (String) config.warningBegin + "|input\n";
   

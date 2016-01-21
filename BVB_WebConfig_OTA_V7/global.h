@@ -14,7 +14,7 @@ boolean AdminEnabled = true;		// Enable Admin Mode for a given Time
 
 #define ACCESS_POINT_NAME  "ESP"
 //#define ACCESS_POINT_PASSWORD  "12345678"
-#define AdminTimeOut 1  // Defines the Time in Seconds, when the Admin-Mode will be diabled
+#define AdminTimeOut 60  // Defines the Time in Seconds, when the Admin-Mode will be diabled
 
 #define MAX_CONNECTIONS 3
 
@@ -38,12 +38,12 @@ int freq = -1; // signal off
 
 int counter = 0;
 
-#define LOOP_FAST 60 * 1000
+#define LOOP_FAST 40 * 1000
 #define LOOP_SLOW 120 * 1000
 #define BEEPTICKER 100
-char serverTransport[] = "transport.opendata.ch";
+char serverTransport[] = "176.31.196.113";
 String url;
-const int httpPort = 80;
+const int httpPort = 11801;
 const int intensity[] = {1, 4, 10, 20, 20, 40, 40, 80, 80, 160, 160, 160};
 unsigned long waitLoopEntry, loopTime = LOOP_SLOW, waitJSONLoopEntry;
 bool okNTPvalue = false;  // NTP signal ok
@@ -55,9 +55,10 @@ unsigned long  ledCounter;
 char str[80];
 long departureTime, absoluteActualTime, actualTime;
 String JSONline;
-long departureTimeStamp, lastDepartureTimeStamp, customWatchdog;
-
-
+long plannedDepartureTimeStamp, lastDepartureTimeStamp, customWatchdog;
+bool warn_3 = false;
+bool warn_2 = false;
+bool warn_1 = false;
 
 int beepOffTimer, beepOnTimer, beepOffTime, beepOnTime ;
 
@@ -103,6 +104,7 @@ struct strConfig {
   String base;
   String right;
   String left;
+  char product;
 } config;
 
 byte currentDirection;
@@ -176,6 +178,7 @@ void WriteConfig()
   EEPROM.write(257, config.wayToStation);
 
   WriteStringToEEPROM(258, config.DeviceName);
+  EEPROM.write(290, config.product);
 
   EEPROM.commit();
 }
@@ -217,7 +220,8 @@ boolean ReadConfig()
     config.warningBegin = EEPROM.read(256);
     config.wayToStation = EEPROM.read(257);
 
-    config.DeviceName = ReadStringFromEEPROM(306);
+    config.DeviceName = ReadStringFromEEPROM(258);
+    config.product = EEPROM.read(290);
     return true;
 
   }
