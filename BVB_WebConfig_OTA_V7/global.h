@@ -29,11 +29,13 @@ int freq = -1; // signal off
 #define BEEPPIN 4
 #define LEFTPIN 16
 #define RIGHTPIN 14
+#define ADMINPIN 12
 #else
 //NodeMCU
 #define BEEPPIN D8
 #define LEFTPIN D5
 #define RIGHTPIN D4
+#define ADMINPIN D3
 #endif
 
 int counter = 0;

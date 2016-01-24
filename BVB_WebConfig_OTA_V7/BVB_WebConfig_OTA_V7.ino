@@ -73,6 +73,7 @@ void setup ( void ) {
   Serial.begin(115200);
   Serial.println("");
   Serial.println("Starting ESP8266");
+  WiFi.mode(WIFI_OFF);
 
   os_timer_setfn(&myTimer, ISRbeepTicker, NULL);
   os_timer_arm(&myTimer, BEEPTICKER, true);
@@ -123,17 +124,13 @@ void setup ( void ) {
     // normal operation
     status = admin;
     tkSecond.attach(1, ISRsecondTick);
-
     currentDirection = EEPROM.read(300);
-    Serial.printf("Current Direction %d \n", currentDirection);
-    if ((currentDirection == left || currentDirection == right) && digitalRead(LEFTPIN)) {
-      // ---------------- RECOVERY -----------------------
-      status = recovery;
-    } else {
-
+    
+    if(!digitalRead(ADMINPIN)) {
+      Serial.println("test");
       // normal operation
       WiFi.mode(WIFI_STA);
-      WiFi.softAP( "ESP");
+      WiFi.softAP( "ESP", "12345678");
 
       // Admin page
       server.on ( "/", []() {
@@ -185,6 +182,27 @@ void setup ( void ) {
       AdminTimeOutCounter = 0;
       waitLoopEntry = millis();
     }
+    
+    else if ((currentDirection == left || currentDirection == right) && digitalRead(LEFTPIN)) {
+      Serial.printf("Current Direction %d \n", currentDirection);
+      // ---------------- RECOVERY -----------------------
+      status = recovery;
+    }
+    else {
+      //switch to idle mode
+        ledColor = red;
+        beepTimes(3);
+        WiFi.mode(WIFI_AP);
+        ConfigureWifi();
+        ledColor = green;
+
+
+        // exit
+        waitJSONLoopEntry = 0;
+        cNTP_Update = 999;
+        status = idle;
+        lastStatus = idle;
+      }
   }
 }
 
