@@ -125,10 +125,9 @@ void setup ( void ) {
     status = admin;
     tkSecond.attach(1, ISRsecondTick);
     currentDirection = EEPROM.read(300);
-    
-    if(!digitalRead(ADMINPIN)) {
-      Serial.println("test");
-      // normal operation
+
+    if (!digitalRead(ADMINPIN)) {
+      // admin operation
       WiFi.mode(WIFI_STA);
       WiFi.softAP( "ESP", "12345678");
 
@@ -182,7 +181,7 @@ void setup ( void ) {
       AdminTimeOutCounter = 0;
       waitLoopEntry = millis();
     }
-    
+
     else if ((currentDirection == left || currentDirection == right) && digitalRead(LEFTPIN)) {
       Serial.printf("Current Direction %d \n", currentDirection);
       // ---------------- RECOVERY -----------------------
@@ -190,19 +189,27 @@ void setup ( void ) {
     }
     else {
       //switch to idle mode
-        ledColor = red;
-        beepTimes(3);
-        WiFi.mode(WIFI_AP);
-        ConfigureWifi();
-        ledColor = green;
+      ledColor = red;
+      beepTimes(3);
+      WiFi.mode(WIFI_AP);
+      ConfigureWifi();
+      ledColor = green;
 
+      // exit
+      waitJSONLoopEntry = 0;
+      cNTP_Update = 999;
 
-        // exit
-        waitJSONLoopEntry = 0;
-        cNTP_Update = 999;
-        status = idle;
-        lastStatus = idle;
+      if ( cNTP_Update > (config.Update_Time_Via_NTP_Every * 60 )) {
+        storeNTPtime();
+        if (DateTime.year > 1970) cNTP_Update = 0;  // trigger loop till date is valid
       }
+
+      WiFi.disconnect();
+      Serial.println("Disconnected from Wifi");
+
+      status = idle;
+      lastStatus = idle;
+    }
   }
 }
 
@@ -242,32 +249,42 @@ void customLoop() {
         // exit
         waitJSONLoopEntry = 0;
         cNTP_Update = 999;
+
         status = idle;
-        lastStatus = idle;
+        lastStatus = admin;
       }
       break;
 
     case idle:
-      if (lastStatus != idle){
+      if (lastStatus != idle) {
         Serial.println("Status idle");
         storeDirToEEPROM(none);
         minTillDep = -999;
         secTillDep = -999;
-       }
-       
-        
-        freq = -1;  // no signal
-        url = "";
-        JSONline = "";
-        warn_3 = false;
-        warn_2 = false;
-        warn_1 = false;  
-        ledColor = off;
-      
+        WiFi.disconnect();
+        Serial.println("Disconnected from Wifi");
+      }
+
+      freq = -1;  // no signal
+      url = "";
+      JSONline = "";
+      warn_3 = false;
+      warn_2 = false;
+      warn_1 = false;
+      ledColor = off;
+
       // exit
       _dir = readButton();
-      if (_dir == left) status = requestLeft;
-      if (_dir == right) status = requestRight;
+      if (_dir == left) {
+        ConfigureWifi();
+        storeNTPtime();
+        status = requestLeft;
+      }
+      if (_dir == right) {
+        ConfigureWifi();
+        storeNTPtime();
+        status = requestRight;
+      }
       lastStatus = idle;
       break;
 
@@ -276,7 +293,7 @@ void customLoop() {
     case requestLeft:
       if (lastStatus != requestLeft) Serial.println("Status requestLeft");
       storeDirToEEPROM(left);
-      url = "/connectionEsp?from=" + config.base + "&to=" + config.left  + "&product="+ config.product +"&timeOffset=" + config.wayToStation;
+      url = "/connectionEsp?from=" + config.base + "&to=" + config.left  + "&product=" + config.product + "&timeOffset=" + config.wayToStation;
       if (lastStatus != requestLeft) storeDepartureString(); // if valid url
       if (JSONline.length() > 1) {
         processRequest();
@@ -301,7 +318,7 @@ void customLoop() {
     case requestRight:
       if (lastStatus != requestRight) Serial.println("Status requestRight");
       storeDirToEEPROM(right);
-      url = "/connectionEsp?from=" + config.base + "&to=" + config.right  + "&product="+ config.product +"&timeOffset=" + config.wayToStation;
+      url = "/connectionEsp?from=" + config.base + "&to=" + config.right  + "&product=" + config.product + "&timeOffset=" + config.wayToStation;
       if (lastStatus != requestRight) storeDepartureString(); // if valid url
       if (JSONline.length() > 1) {
         processRequest();
@@ -365,12 +382,12 @@ void customLoop() {
 
   // store departure time String from openTransport
   if (millis() - waitJSONLoopEntry > loopTime) {
-    if (minTillDep < 0 || minTillDep > config.wayToStation+1) { // no updates in the last minute
+    if (minTillDep < 0 || minTillDep > config.wayToStation + 1) { // no updates in the last minute
       requestBackendUpdate(config.wayToStation);
     }
-    else if(minTillDep <= config.wayToStation && minTillDep > 0){
-        requestBackendUpdate(minTillDep);
-      }
+    else if (minTillDep <= config.wayToStation && minTillDep > 0) {
+      requestBackendUpdate(minTillDep);
+    }
   }
 
   // Display LED
@@ -408,14 +425,14 @@ void processRequest() {
       _diffSec = departureTime - actualTime;
       if (_diffSec < -10000) _diffSec += 24 * 3600;  // correct if time is before midnight and departure is after midnight
       _diffMin = (_diffSec / 60) - config.wayToStation;
-      _diffSecDep = _diffSec - (config.wayToStation*60) ;
+      _diffSecDep = _diffSec - (config.wayToStation * 60) ;
     } else _diffMin = -999;
     _positionDeparture++;
   } while (_diffMin < 0 && _positionDeparture <= MAX_CONNECTIONS + 1);  // next departure if first not reachable
 
   minTillDep = (_positionDeparture <= MAX_CONNECTIONS) ? _diffMin : -999; // no connection found
   secTillDep = (_positionDeparture <= MAX_CONNECTIONS) ? _diffSecDep : -999; // no connection found
-  
+
   if (minTillDep != -999) {  // valid result
     freq = (minTillDep >= 0 && secTillDep < config.warningBegin) ? intensity[minTillDep] : freq = -1; //set frequency if minTillDep between 10 and zero minutes
     checkWarn(minTillDep);
@@ -424,13 +441,13 @@ void processRequest() {
 }
 
 
-void requestBackendUpdate(int offset){
-  if (url.length() > 1){
+void requestBackendUpdate(int offset) {
+  if (url.length() > 1) {
     setUrlTimeOffset(offset);
     storeDepartureString();
-    } 
+  }
   if (JSONline != "") waitJSONLoopEntry = millis();
-  
+
 }
 
 boolean getStatus() {
@@ -543,10 +560,10 @@ void decodeDepartureTime(int pos) {
 
   hh = findJSONkeyword("departureTime", "", "" , separatorPosition);
   departureTime = parseJSONDate(hh);
-  
+
   hh = findJSONkeyword("plannedDepartureTimestamp", "", "" , separatorPosition);  // find unique identifier of connection
   plannedDepartureTimeStamp = parseJSONnumber(hh);
-  
+
 }
 
 
@@ -610,9 +627,9 @@ void beep(int _dura) {
 
 }
 
-void beepTimes(int times){
+void beepTimes(int times) {
   for (int hi = 0; hi < times; hi++) beep(2);
-  }
+}
 
 void setSignal (int _onTime, int _offTime) {
   if (beeperStatus == beeperIdle) {
@@ -621,26 +638,26 @@ void setSignal (int _onTime, int _offTime) {
   }
 }
 
-void checkWarn(int minTillDep){
-  if(minTillDep == 2 && !warn_3){
-      beepTimes(3);
-      warn_3 = true;
-    }
-    else if(minTillDep == 1 && !warn_2){
-      beepTimes(2);
-      warn_2 = true;
-    }
-    else if(minTillDep == 0 && !warn_1){
-      beepTimes(1);
-      warn_1 = true;
-    }
+void checkWarn(int minTillDep) {
+  if (minTillDep == 2 && !warn_3) {
+    beepTimes(3);
+    warn_3 = true;
   }
+  else if (minTillDep == 1 && !warn_2) {
+    beepTimes(2);
+    warn_2 = true;
+  }
+  else if (minTillDep == 0 && !warn_1) {
+    beepTimes(1);
+    warn_1 = true;
+  }
+}
 
-void setUrlTimeOffset(int min){
+void setUrlTimeOffset(int min) {
   int offsetPosition = url.indexOf("timeOffset=");
-  String urlPart = url.substring(0,offsetPosition+11);
-  url = urlPart+min;
-}  
+  String urlPart = url.substring(0, offsetPosition + 11);
+  url = urlPart + min;
+}
 
 // define loop time based on time till departure
 int getLoopTime(int _timeTillDeparture) {
