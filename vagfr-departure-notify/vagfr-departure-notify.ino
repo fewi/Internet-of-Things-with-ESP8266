@@ -72,7 +72,7 @@ void setup ( void ) {
     config.Netmask[0] = 255; config.Netmask[1] = 255; config.Netmask[2] = 255; config.Netmask[3] = 0;
     config.Gateway[0] = 192; config.Gateway[1] = 168; config.Gateway[2] = 1; config.Gateway[3] = 1;
     config.ntpServerName = "0.ch.pool.ntp.org";
-    config.Update_Time_Via_NTP_Every =  5;
+    config.Update_Time_Via_NTP_Every =  60;
     config.timeZone = 10;
     config.isDayLightSaving = true;
     config.DeviceName = "vagfr";
@@ -171,7 +171,7 @@ void setup ( void ) {
 
       // exit
       waitJSONLoopEntry = 0;
-      cNTP_Update = 999;
+      cNTP_Update = 9999;
 
       if ( cNTP_Update > (config.Update_Time_Via_NTP_Every * 60 )) {
         storeNTPtime();
@@ -222,7 +222,7 @@ void customLoop() {
 
         // exit
         waitJSONLoopEntry = 0;
-        cNTP_Update = 999;
+        cNTP_Update = 9999;
 
         status = idle;
         lastStatus = admin;
@@ -340,7 +340,7 @@ void customLoop() {
           lastStatus = recovery;
           break;
       }
-      cNTP_Update = 999; // trigger NTP immediately
+      cNTP_Update = 9999; // trigger NTP immediately
       minTillDep = -999;
       break;
 
