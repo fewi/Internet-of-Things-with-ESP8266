@@ -6,6 +6,9 @@
 #include <Ticker.h>
 #include <EEPROM.h>
 #include <WiFiUdp.h>
+#include <Wire.h>
+#include "SSD1306.h"
+#include "SSD1306Ui.h"
 //#include <credentials.h>
 
 #include "helpers.h"
@@ -24,6 +27,11 @@
 #include "Page_General.h"
 #include "Page_applSettings.h"
 #include "PAGE_NetworkConfiguration.h"
+
+// Initialize the oled display for address 0x3c
+// sda-pin=14 and sdc-pin=12
+SSD1306   display(0x3c, D3, D4);
+//SSD1306Ui ui     ( &display );
 
 extern "C" {
 #include "user_interface.h"
@@ -48,6 +56,13 @@ void setup ( void ) {
   Serial.println("");
   Serial.println("Starting ESP8266");
   WiFi.mode(WIFI_OFF);
+
+
+  display.init();
+
+  display.flipScreenVertically();
+
+
 
   os_timer_setfn(&myTimer, ISRbeepTicker, NULL);
   os_timer_arm(&myTimer, BEEPTICKER, true);
@@ -247,6 +262,8 @@ void customLoop() {
       warn_1 = false;
       ledColor = off;
 
+      drawIdleTime(&display);
+
       // exit
       _dir = readButton();
       if (_dir == left) {
@@ -265,15 +282,20 @@ void customLoop() {
 
 
     case requestLeft:
-      if (lastStatus != requestLeft) Serial.println("Status requestLeft");
+      if (lastStatus != requestLeft) {
+        Serial.println("Status requestLeft");
+      }
+
       storeDirToEEPROM(left);
       url = "/connectionEsp?from=" + config.base + "&to=" + config.left  + "&product=" + config.product + "&timeOffset=" + config.wayToStation;
       if (lastStatus != requestLeft) storeDepartureString(); // if valid url
       if (JSONline.length() > 1) {
-        processRequest();
+        processRequest("LEFT");
 
         // exit
-        if (lastDepartureTimeStamp != plannedDepartureTimeStamp && (lastStatus == requestRight || lastStatus == requestLeft)) status = idle; // next departure time choosen
+        if (lastDepartureTimeStamp != plannedDepartureTimeStamp && (lastStatus == requestRight || lastStatus == requestLeft))
+          status = idle; // next departure time choosen
+
         //  Serial.printf("lastDepartureTimeStamp %d departureTimeStamp %d lastStatus %d \n", lastDepartureTimeStamp , departureTimeStamp, lastStatus);
         lastDepartureTimeStamp = plannedDepartureTimeStamp;
         lastStatus = requestLeft;
@@ -290,12 +312,14 @@ void customLoop() {
 
 
     case requestRight:
-      if (lastStatus != requestRight) Serial.println("Status requestRight");
+      if (lastStatus != requestRight) {
+        Serial.println("Status requestRight");
+      }
       storeDirToEEPROM(right);
       url = "/connectionEsp?from=" + config.base + "&to=" + config.right  + "&product=" + config.product + "&timeOffset=" + config.wayToStation;
       if (lastStatus != requestRight) storeDepartureString(); // if valid url
       if (JSONline.length() > 1) {
-        processRequest();
+        processRequest("RIGHT");
 
         // exit
         if (lastDepartureTimeStamp != plannedDepartureTimeStamp && (lastStatus == requestRight || lastStatus == requestRight)) status = idle; // next departure time choosen
@@ -383,13 +407,15 @@ void customLoop() {
     _lastStatus = status;
   }
   customWatchdog = millis();
+
+
 }
 
 
 //------------------------- END LOOP -------------------------------------
 
 
-void processRequest() {
+void processRequest(String direction) {
   long _diffSec, _diffMin, _diffSecDep;
 
   int   _positionDeparture = 1;
@@ -408,6 +434,7 @@ void processRequest() {
   secTillDep = (_positionDeparture <= MAX_CONNECTIONS) ? _diffSecDep : -999; // no connection found
 
   if (minTillDep != -999) {  // valid result
+    drawDepartureTime(&display, direction);
     freq = (minTillDep >= 0 && secTillDep < config.warningBegin) ? intensity[minTillDep] : freq = -1; //set frequency if minTillDep between 10 and zero minutes
     checkWarn(minTillDep);
     loopTime = getLoopTime(minTillDep);
@@ -538,6 +565,12 @@ void decodeDepartureTime(int pos) {
   hh = findJSONkeyword("plannedDepartureTimestamp", "", "" , separatorPosition);  // find unique identifier of connection
   plannedDepartureTimeStamp = parseJSONnumber(hh);
 
+  hh = findJSONkeyword("delay", "", "" , separatorPosition);  // find unique identifier of connection
+  lcdDepartureDelay = parseJSONdelay(hh);
+
+  hh = findJSONkeyword("to", "", "" , separatorPosition);  // find unique identifier of connection
+  lcdToStation = parseJSONstation(hh);
+
 }
 
 
@@ -546,9 +579,6 @@ int getTimeStamp(int pos) {
   int hh = findJSONkeyword("plannedDepartureTimestamp", "", "", pos );
   return JSONline.substring(pos, pos + 4).toInt();
 }
-
-
-
 
 
 long parseJSONDate(int pos) {
@@ -573,13 +603,20 @@ long parseJSONDate(int pos) {
   return hi;
 }
 
-
-
 int parseJSONnumber(int pos) {
   pos = pos + 27;
   return JSONline.substring(pos, pos + 10).toInt();
 }
 
+int parseJSONdelay(int pos) {
+  pos = pos + 7;
+  return JSONline.substring(pos, JSONline.indexOf(",", pos)).toInt();
+}
+
+String parseJSONstation(int pos) {
+  pos = pos + 6;
+  return JSONline.substring(pos, JSONline.indexOf("\"", pos));
+}
 
 
 defDirection readButton() {
@@ -827,5 +864,69 @@ void otaReceive() {
     free(sbuf);
   }
 }
+
+
+
+//Display time when idle
+bool drawIdleTime(SSD1306 *display) {
+
+  long _tim = actualTime;
+  int hours = _tim / 3600;
+  int res = _tim - hours * 3600;
+  int minutes = res / 60;
+  res = res - (minutes * 60);
+  int seconds = res;
+  char buffer[6];
+  ///< This is the buffer for the string the sprintf outputs to
+  sprintf(buffer, "%02d:%02d:%02d", hours, minutes, seconds);
+
+  display->clear();
+  display->setTextAlignment(TEXT_ALIGN_CENTER);
+  display->setFont(ArialMT_Plain_24);
+  display->drawString(64, 20, buffer);
+
+  display->display();
+  return true;
+}
+
+//Time to departure
+bool drawDepartureTime(SSD1306 *display, String direction) {
+  int secs = secTillDep % 60;
+
+  char buffer[6];
+  ///< This is the buffer for the string the sprintf outputs to
+  sprintf(buffer, "%d : %02d", minTillDep, secs);
+
+  display->clear();
+
+
+
+  //direction
+  display->setTextAlignment(TEXT_ALIGN_RIGHT);
+  display->setFont(ArialMT_Plain_10);
+  display->drawString(128, 0, lcdToStation);
+
+  //delay
+  if (lcdDepartureDelay > 1) {
+    //timeleft
+    display->setTextAlignment(TEXT_ALIGN_CENTER);
+    display->setFont(ArialMT_Plain_24);
+    display->drawString(64, 16, buffer);
+
+    display->setTextAlignment(TEXT_ALIGN_CENTER);
+    display->setFont(ArialMT_Plain_16);
+    display->drawString(64, 48, "( +" + String(lcdDepartureDelay) + " )");
+  } else {
+    //timeleft
+    display->setTextAlignment(TEXT_ALIGN_CENTER);
+    display->setFont(ArialMT_Plain_24);
+    display->drawString(64, 24, buffer);
+  }
+
+
+  display->display();
+  return true;
+}
+
 
 

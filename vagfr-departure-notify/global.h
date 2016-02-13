@@ -32,7 +32,7 @@ int freq = -1; // signal off
 #define ADMINPIN 12
 #else
 //NodeMCU
-#define BEEPPIN D8
+#define BEEPPIN D1
 #define LEFTPIN D5
 #define RIGHTPIN D4
 #define ADMINPIN D3
@@ -43,9 +43,13 @@ int counter = 0;
 #define LOOP_FAST 40 * 1000
 #define LOOP_SLOW 120 * 1000
 #define BEEPTICKER 100
+
 char serverTransport[] = "176.31.196.113";
-String url;
+//char serverTransport[] = "192.168.2.160";
 const int httpPort = 11801;
+//const int httpPort = 8080;
+
+String url;
 const int intensity[] = {1, 4, 10, 20, 20, 40, 40, 80, 80, 160, 160, 160};
 unsigned long waitLoopEntry, loopTime = LOOP_SLOW, waitJSONLoopEntry;
 bool okNTPvalue = false;  // NTP signal ok
@@ -61,6 +65,9 @@ long plannedDepartureTimeStamp, lastDepartureTimeStamp, customWatchdog;
 bool warn_3 = false;
 bool warn_2 = false;
 bool warn_1 = false;
+
+String lcdToStation;
+int lcdDepartureDelay;
 
 int beepOffTimer, beepOnTimer, beepOffTime, beepOnTime ;
 
@@ -121,16 +128,27 @@ defStatus _lastStatus;
 */
 void ConfigureWifi()
 {
+  SSD1306   display(0x3c, D3, D4);
   Serial.println("Configuring Wifi");
 
   WiFi.begin ("WLAN", "password");
 
   WiFi.begin (config.ssid.c_str(), config.password.c_str());
-
+  int counter = 0;
   while (WiFi.status() != WL_CONNECTED) {
     Serial.println("WiFi not connected");
     led(red);
+    display.setFont(ArialMT_Plain_10);
+    display.setTextAlignment(TEXT_ALIGN_CENTER);
+    display.setContrast(255);
+    display.clear();
+    display.drawString(64, 10, "Connecting to WiFi");
+    display.drawXbm(46, 30, 8, 8, counter % 3 == 0 ? ANIMATION_activeSymbole : ANIMATION_inactiveSymbole);
+    display.drawXbm(60, 30, 8, 8, counter % 3 == 1 ? ANIMATION_activeSymbole : ANIMATION_inactiveSymbole);
+    display.drawXbm(74, 30, 8, 8, counter % 3 == 2 ? ANIMATION_activeSymbole : ANIMATION_inactiveSymbole);
+    display.display();
     delay(500);
+    counter++;
   }
   if (!config.dhcp)
   {
