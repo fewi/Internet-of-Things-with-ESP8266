@@ -33,9 +33,9 @@ int freq = -1; // signal off
 #else
 //NodeMCU
 #define BEEPPIN D1
-#define LEFTPIN D0
-#define RIGHTPIN D2
-#define ADMINPIN D5
+#define LEFTPIN D6
+#define RIGHTPIN D5
+#define ADMINPIN D0
 #define SDAPIN D3
 #define SDCPIN D4
 #endif
