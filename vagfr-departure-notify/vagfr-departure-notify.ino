@@ -30,7 +30,7 @@
 
 // Initialize the oled display for address 0x3c
 // sda-pin=14 and sdc-pin=12
-SSD1306   display(0x3c, D3, D4);
+SSD1306   display(0x3c, SDAPIN, SDCPIN);
 //SSD1306Ui ui     ( &display );
 
 extern "C" {
@@ -116,6 +116,8 @@ void setup ( void ) {
     currentDirection = EEPROM.read(300);
 
     if (!digitalRead(ADMINPIN)) {
+      drawAdminMode(&display);
+      
       // admin operation
       WiFi.mode(WIFI_STA);
       WiFi.softAP( "ESP", "12345678");
@@ -900,11 +902,18 @@ bool drawDepartureTime(SSD1306 *display, String direction) {
   display->clear();
 
 
+  if (lcdToStation.length() > 18) {
+    //direction
+    display->setTextAlignment(TEXT_ALIGN_RIGHT);
+    display->setFont(ArialMT_Plain_10);
+    display->drawString(128, 0, lcdToStation);
+  } else {
+    //direction
+    display->setTextAlignment(TEXT_ALIGN_RIGHT);
+    display->setFont(ArialMT_Plain_10);
+    display->drawString(128, 0, "-> " + lcdToStation);
+  }
 
-  //direction
-  display->setTextAlignment(TEXT_ALIGN_RIGHT);
-  display->setFont(ArialMT_Plain_10);
-  display->drawString(128, 0, lcdToStation);
 
   //delay
   if (lcdDepartureDelay > 1) {
@@ -928,5 +937,16 @@ bool drawDepartureTime(SSD1306 *display, String direction) {
   return true;
 }
 
+//Time to departure
+bool drawAdminMode(SSD1306 *display) {
+  display->clear();
 
+  //timeleft
+  display->setTextAlignment(TEXT_ALIGN_CENTER);
+  display->setFont(ArialMT_Plain_16);
+  display->drawString(64, 24, "ADMIN MODE");
+
+  display->display();
+  return true;
+}
 

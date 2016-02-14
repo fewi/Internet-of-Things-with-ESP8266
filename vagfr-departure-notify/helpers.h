@@ -132,7 +132,7 @@ String urldecode(String input) // (based on https://code.google.com/p/avr-netino
 #else
   // NodeMCU
   #define LED_RED D7
-  #define LED_GREEN D6
+  #define LED_GREEN D8
 #endif
 
 

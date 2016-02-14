@@ -33,9 +33,11 @@ int freq = -1; // signal off
 #else
 //NodeMCU
 #define BEEPPIN D1
-#define LEFTPIN D5
-#define RIGHTPIN D4
-#define ADMINPIN D3
+#define LEFTPIN D0
+#define RIGHTPIN D2
+#define ADMINPIN D5
+#define SDAPIN D3
+#define SDCPIN D4
 #endif
 
 int counter = 0;
@@ -44,6 +46,7 @@ int counter = 0;
 #define LOOP_SLOW 120 * 1000
 #define BEEPTICKER 100
 
+//char serverTransport[] = "efa.f3lix-photo.de";
 char serverTransport[] = "176.31.196.113";
 //char serverTransport[] = "192.168.2.160";
 const int httpPort = 11801;
@@ -154,6 +157,7 @@ void ConfigureWifi()
   {
     WiFi.config(IPAddress(config.IP[0], config.IP[1], config.IP[2], config.IP[3] ),  IPAddress(config.Gateway[0], config.Gateway[1], config.Gateway[2], config.Gateway[3] ) , IPAddress(config.Netmask[0], config.Netmask[1], config.Netmask[2], config.Netmask[3] ));
   }
+  display.clear();
 }
 
 
