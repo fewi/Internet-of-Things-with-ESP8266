@@ -9,5 +9,8 @@ This code implements work of:
  -  Andreas Spiess for most of the inital ESP Code [Internet-of-Things-with-ESP8266](https://github.com/SensorsIot/Internet-of-Things-with-ESP8266)
  -  John Lassen for the [WebConfig](http://www.john-lassen.de/index.php/projects/esp-8266-arduino-ide-webconfig)
 
-## Prototype##
+## Prototype II##
+![Prototype](http://i.imgur.com/7hAsbFr.jpg)
+
+## Prototype I##
 ![Prototype](http://i.imgur.com/FKxQzVB.jpg)
