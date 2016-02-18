@@ -120,7 +120,7 @@ void setup ( void ) {
       
       // admin operation
       WiFi.mode(WIFI_STA);
-      WiFi.softAP( "ESP", "12345678");
+      WiFi.softAP( ACCESS_POINT_NAME, ACCESS_POINT_PASSWORD);
 
       // Admin page
       server.on ( "/", []() {

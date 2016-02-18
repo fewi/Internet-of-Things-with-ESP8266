@@ -13,12 +13,10 @@ Ticker tkSecond;												// Second - Timer for Updating Datetime Structure
 boolean AdminEnabled = true;		// Enable Admin Mode for a given Time
 
 #define ACCESS_POINT_NAME  "ESP"
-//#define ACCESS_POINT_PASSWORD  "12345678"
-#define AdminTimeOut 60  // Defines the Time in Seconds, when the Admin-Mode will be diabled
+#define ACCESS_POINT_PASSWORD  "123456789"
+#define AdminTimeOut 90  // Defines the Time in Seconds, when the Admin-Mode will be diabled
 
 #define MAX_CONNECTIONS 3
-
-
 
 
 //custom declarations
@@ -46,11 +44,12 @@ int counter = 0;
 #define LOOP_SLOW 120 * 1000
 #define BEEPTICKER 100
 
-//char serverTransport[] = "efa.f3lix-photo.de";
-char serverTransport[] = "176.31.196.113";
+char serverTransport[] = "efa-fewi.rhcloud.com";
+const int httpPort = 80;
+
+//Local
 //char serverTransport[] = "192.168.2.160";
-const int httpPort = 11801;
-//const int httpPort = 8080;
+//const int httpPort = 11801;
 
 String url;
 const int intensity[] = {1, 4, 10, 20, 20, 40, 40, 80, 80, 160, 160, 160};
