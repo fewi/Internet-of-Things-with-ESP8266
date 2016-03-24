@@ -44,7 +44,7 @@ int counter = 0;
 #define LOOP_SLOW 120 * 1000
 #define BEEPTICKER 100
 
-char serverTransport[] = "efa-fewi.rhcloud.com";
+char serverTransport[] = "transportrest-sbiermann.rhcloud.com";
 const int httpPort = 80;
 
 //Local

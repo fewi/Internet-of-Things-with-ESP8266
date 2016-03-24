@@ -94,8 +94,8 @@ void setup ( void ) {
     config.wayToStation = 4;
     config.warningBegin = 5;
     config.base = "6930811";
-    config.right = "6906508";
-    config.left = "6930206";
+    config.right = "6930206";
+    config.left = "6906508";
     config.product = 'T';
     WriteConfig();
   }
