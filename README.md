@@ -10,6 +10,10 @@ This code implements work of:
  -  John Lassen for the [WebConfig](http://www.john-lassen.de/index.php/projects/esp-8266-arduino-ide-webconfig)
  -  Daniel Eichhorn for the [esp8266-oled-ssd1306](https://github.com/squix78/esp8266-oled-ssd1306)
 
+ ## Final Product ##
+![FinalProduct1](http://i.imgur.com/exay1v6.jpg)
+![FinalProduct2](http://i.imgur.com/qItKMZ5.jpg)
+
 ## Prototype II##
 ![Prototype](http://i.imgur.com/7hAsbFr.jpg)
 
